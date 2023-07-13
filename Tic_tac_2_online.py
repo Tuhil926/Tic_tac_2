@@ -31,91 +31,16 @@ score_file.close()
 clearButtonText = "Clear"
 
 
-def send_file(filename, host, port):
-    # get the file size
-    filesize = os.path.getsize(filename)
-    # create the client socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #print(f"[+] Connecting to {host}:{port}")
-    s.connect((host, port))
-    #print("[+] Connected.")
-
-    # send the filename and filesize
-    #s.send(f"{filename}{SEPARATOR}{filesize}".encode())
-
-    # start sending the file
-    #progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+def send_file(filename, s):
     with open(filename, "rb") as f:
-        while True:
-            # read the bytes from the file
-            bytes_read = f.read(BUFFER_SIZE)
-            if not bytes_read:
-                # file transmitting is done
-                break
-            # we use sendall to assure transmission in
-            # busy networks
-            s.sendall(bytes_read)
-            # update the progress bar
-            #progress.update(len(bytes_read))
-
-    # close the socket
-    s.close()
-    #print("                                     message sent")
+        bytes_read = f.read()
+        s.sendall(bytes_read)
 
 
-def receive_file(filename):
-    global client_ip
-    # device's IP address
-    SERVER_HOST = "0.0.0.0"
-    SERVER_PORT = 5001
-    # receive 4096 bytes each time
-    BUFFER_SIZE = 4096
-    SEPARATOR = "<SEPARATOR>"
-    # create the server socket
-    # TCP socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # bind the socket to our local address
-    s.bind((SERVER_HOST, SERVER_PORT))
-    # enabling our server to accept connections
-    # 5 here is the number of unaccepted connections that
-    # the system will allow before refusing new connections
-    s.listen(5)
-    #print(f"[*] Listening as {SERVER_HOST}:{SERVER_PORT}")
-    # accept connection if there is any
-    client_socket, address = s.accept()
-    # if below code is executed, that means the sender is connected
-    #print(f"[+] {address} is connected.")
-
-    # receive the file infos
-    # receive using client socket, not server socket
-    #received = client_socket.recv(BUFFER_SIZE)
-    #print(received)
-    #received = received.decode()
-    #rec_filename, filesize = received.split(SEPARATOR)
-    # remove absolute path if there is
-    # convert to integer
-    #filesize = int(filesize)
-    # start receiving the file from the socket
-    # and writing to the file stream
-    # progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+def receive_file(filename, s):
     with open(filename, "wb") as f:
-        while True:
-            # read 1024 bytes from the socket (receive)
-            bytes_read = client_socket.recv(BUFFER_SIZE)
-            if not bytes_read:
-                # nothing is received
-                # file transmitting is done
-                break
-            # write to the file the bytes we just received
-            f.write(bytes_read)
-            # update the progress bar
-            # progress.update(len(bytes_read))
-
-    # close the client socket
-    client_socket.close()
-    # close the server socket
-    s.close()
-    client_ip = address[0]
+        bytes_read = s.recv(2048)
+        f.write(bytes_read)
 
 
 def go_to_game():
@@ -802,9 +727,16 @@ class TicTac2_server:
 
         self.starting_player = 1
 
-        #inp_file = open("server_data/received.bin", "wb")
-        #inp_file.write(b"")
-        #inp_file.close()
+        self.received_data = None
+        
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.bind(("0.0.0.0", 4000))
+        self.socket.listen()
+        self.conn, addr = self.socket.accept()
+        print("received connection with address: " + addr[0])
+        thr = threading.Thread(target=self.sync_data)
+        thr.start()
+
 
     def draw(self):
         for i in range(1, self.column_count):
@@ -830,23 +762,11 @@ class TicTac2_server:
         if self.player == 1:
             self.check_if_clicked(mouse_pressed, self.mouse_pressed, mouse_pos)
         else:
-            try:
-                inp_file = open(r"server_data\\received.bin", "rb")
-                data = pickle.load(inp_file)
-                #print(data)
+            if self.received_data is not None:
+                data = pickle.loads(self.received_data)
                 self.check_if_clicked(data[1], self.client_mouse_pressed, data[0])
                 self.client_mouse_pressed = data[1]
-                inp_file.close()
-
-                data_file = open("server_data\\received.bin", "wb")
-                data = [[0, 0], 0]
-                pickle.dump(data, data_file)
-                data_file.close()
-                #inp_file = open("server_data/received.bin", "wb")
-                #inp_file.write(b"")
-                #inp_file.close()
-            except EOFError:
-                print("file empty")
+                self.received_data = None
 
         self.normalise_squares()
 
@@ -950,8 +870,8 @@ class TicTac2_server:
         self.square_width = 60
         go_to_menu()
 
-        thread = threading.Thread(target=self.send_data)
-        thread.start()
+        # thread = threading.Thread(target=self.send_data)
+        # thread.start()
 
     def win(self, player, start_pos_of_line, end_pos_of_line):
         global player1Score
@@ -1076,8 +996,8 @@ class TicTac2_server:
                     add_row_if_consecutively_extended()
             self.check_if_won()
             self.normalise_squares()
-            thread = threading.Thread(target=self.send_data)
-            thread.start()
+            # thread = threading.Thread(target=self.send_data)
+            # thread.start()
 
     def send_data(self):
         data_file = open("server_data\\data_file.bin", "wb")
@@ -1094,10 +1014,21 @@ class TicTac2_server:
         while running:
             receive_file("server_data\\received.bin")
             host = client_ip
+    
+    def sync_data(self):
+        while running:
+            self.received_data = self.conn.recv(2048)
+            print("received")
+            data = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
+            to_send = pickle.dumps(data)
+            self.conn.sendall(to_send)
+            print("sent")
+            time.sleep(0.1)
 
 
 class TicTac2_client:
-    def __init__(self):
+    def __init__(self, address):
+        self.address = address
         self.mouse_pressed = True
         self.player = 1
         self.color = GRID_COLOR
@@ -1122,11 +1053,20 @@ class TicTac2_client:
 
         self.starting_player = 1
 
-        inp_file = open("client_data/received.bin", "wb")
-        dat = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
-        pickle.dump(dat, inp_file)
-        inp_file.close()
+        # inp_file = open("client_data/received.bin", "wb")
+        # dat = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
+        # pickle.dump(dat, inp_file)
+        # inp_file.close()
 
+        self.to_send = []
+        self.received_data = None
+
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.connect((self.address, 4000))
+        print("Connected to", self.server_sock.getsockname())
+        thr = threading.Thread(target=self.sync_data)
+        thr.start()
+        
     def draw(self):
         for i in range(1, self.column_count):
             pygame.draw.line(screen, self.color,
@@ -1152,13 +1092,16 @@ class TicTac2_client:
         mouse_pos = pygame.mouse.get_pos()
         mouse_pressed = pygame.mouse.get_pressed()[0]
 
+        if mouse_pressed and not self.mouse_pressed:
+            self.to_send.insert(0, [mouse_pos, 1])
+
         self.check_if_won()
 
         if mouse_pressed - self.mouse_pressed == 1:
             if self.player == 2:
                 data = [mouse_pos, mouse_pressed]
-                thread = threading.Thread(target=self.send_data, args=(data,))
-                thread.start()
+                # thread = threading.Thread(target=self.send_data, args=(data,))
+                # thread.start()
                 #invoke(self.send_data_auto, 0.5)
 
         for i in range(self.row_count):
@@ -1172,19 +1115,15 @@ class TicTac2_client:
         if self.row_count*self.square_width > screen_height - 10 or self.column_count * self.square_width > screen_width - 10:
             self.square_width *= 0.9
 
-        try:
-            recv_file = open(r"client_data\\received.bin", "rb")
-            data = pickle.load(recv_file)
-            #print(data)
+        if self.received_data is not None:
+            data = pickle.loads(self.received_data)
             self.squares = data[0]
             self.square_values = data[1]
             self.req_to_win = data[2]
             player1Score = data[3]
             player2Score = data[4]
             self.player = data[5]
-            recv_file.close()
-        except EOFError:
-            pass
+            self.received_data = None
 
         self.mouse_pressed = mouse_pressed
 
@@ -1208,9 +1147,9 @@ class TicTac2_client:
         self.square_width = 60
         go_to_menu()
 
-        data = [[0, 0], 0]
-        thread = threading.Thread(target=self.send_data, args=(data,))
-        thread.start()
+        # data = [[0, 0], 0]
+        # thread = threading.Thread(target=self.send_data, args=(data,))
+        # thread.start()
 
     def win(self, player, start_pos_of_line, end_pos_of_line):
         global player1Score
@@ -1314,6 +1253,23 @@ class TicTac2_client:
             receive_file("client_data\\received.bin")
             print("receiver file")
             host = client_ip
+    
+    def sync_data(self):
+        while running:
+            # data_file = open("client_data\\data_file.bin", "wb")
+            data = None
+            if len(self.to_send):
+                data = self.to_send.pop()
+            else:
+                data = [[0, 0], 0]
+            to_send_ = pickle.dumps(data)
+            # data_file.close()
+            # send_file("client_data\\data_file.bin", self.server_sock)
+            self.server_sock.sendall(to_send_)
+            print("sent")
+            # receive_file("client_data\\received.bin", self.server_sock)
+            self.received_data = self.server_sock.recv(2048)
+            print("rec")
 
 
 class Menu:
@@ -1514,11 +1470,11 @@ class GameSelector:
             screen.blit(text3, [screen_width / 2 - text3.get_width() / 2, 280])
             screen.blit(text4, [screen_width / 2 - text4.get_width() / 2, 370])
             pygame.display.update()
-            receive_file("server_data\\received.bin")
+            # receive_file("server_data\\received.bin")
             host = client_ip
             game = TicTac2_server()
-            thread = threading.Thread(target=game.look_for_messages)
-            thread.start()
+            # thread = threading.Thread(target=game.look_for_messages)
+            # thread.start()
             go_to_menu()
         elif self.screen_number == 3:
             self.backButton.draw(screen)
@@ -1535,11 +1491,12 @@ class GameSelector:
                 data_file.close()
 
                 screen.blit(text2, [screen_width / 2 - text.get_width() / 2, 400])
-                send_file("client_data\\data_file.bin", host, 5001)
+                # send_file("client_data\\data_file.bin", host, 5001)
                 go_to_menu()
-                game = TicTac2_client()
-                thread = threading.Thread(target=game.look_for_messages)
-                thread.start()
+                pygame.display.update()
+                game = TicTac2_client(host)
+                # thread = threading.Thread(target=game.look_for_messages)
+                # thread.start()
         elif screen_number == 4:
             game = TicTac2()
             go_to_menu()

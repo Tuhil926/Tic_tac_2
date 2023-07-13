@@ -728,7 +728,7 @@ class TicTac2_server:
         self.starting_player = 1
 
         self.received_data = None
-        
+
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(("0.0.0.0", 4000))
         self.socket.listen()
@@ -1470,11 +1470,8 @@ class GameSelector:
             screen.blit(text3, [screen_width / 2 - text3.get_width() / 2, 280])
             screen.blit(text4, [screen_width / 2 - text4.get_width() / 2, 370])
             pygame.display.update()
-            # receive_file("server_data\\received.bin")
             host = client_ip
             game = TicTac2_server()
-            # thread = threading.Thread(target=game.look_for_messages)
-            # thread.start()
             go_to_menu()
         elif self.screen_number == 3:
             self.backButton.draw(screen)
@@ -1485,18 +1482,11 @@ class GameSelector:
             self.input_box.draw()
             self.input_box.update()
             if host is not None:
-                data_file = open("client_data\\data_file.bin", "wb")
-                data = [[0, 0], 0]
-                pickle.dump(data, data_file)
-                data_file.close()
 
                 screen.blit(text2, [screen_width / 2 - text.get_width() / 2, 400])
-                # send_file("client_data\\data_file.bin", host, 5001)
                 go_to_menu()
                 pygame.display.update()
                 game = TicTac2_client(host)
-                # thread = threading.Thread(target=game.look_for_messages)
-                # thread.start()
         elif screen_number == 4:
             game = TicTac2()
             go_to_menu()

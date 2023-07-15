@@ -2,7 +2,6 @@ import pygame
 import threading
 import time
 import socket
-import os
 import pickle
 import animations.animations as animations
 
@@ -16,9 +15,6 @@ PLAYER2_COLOR = [252, 49, 3]
 
 game_state = "game_select"
 
-SEPARATOR = "<SEPARATOR>"
-BUFFER_SIZE = 1024*4
-
 client_ip = None
 host = None
 
@@ -29,18 +25,6 @@ player2Score = int(scores[1])
 score_file.close()
 
 clearButtonText = "Clear"
-
-
-def send_file(filename, s):
-    with open(filename, "rb") as f:
-        bytes_read = f.read()
-        s.sendall(bytes_read)
-
-
-def receive_file(filename, s):
-    with open(filename, "wb") as f:
-        bytes_read = s.recv(2048)
-        f.write(bytes_read)
 
 
 def go_to_game():
@@ -102,10 +86,12 @@ def clearScores():
 
 screen_number = 0
 def go_to_initial_menu():
+    global game_state
     global screen_number
     screen_number = 0
     game_selector.offline_button_anim.play(15)
     game_selector.online_button_anim.play(15)
+    game_state = "game_select"
 
 
 def set_game_mode_to_offline():
@@ -190,7 +176,6 @@ class Button:
     def draw(self, win, outline=None):
         self.x = self.pos[0]
         self.y = self.pos[1]
-        # Call this method to draw the Button on the screen
         if outline:
             pygame.draw.rect(win, outline, (self.x - 2, self.y - 2, self.width + 4, self.height + 4), 0)
 
@@ -217,7 +202,6 @@ class Button:
                 self.color = self.defaultColor
 
     def isOver(self, pos):
-        # Pos is the mouse position or a tuple of (x,y) coordinates
         if pos[0] > self.x and pos[0] < self.x + self.width:
             if pos[1] > self.y and pos[1] < self.y + self.height:
                 return True
@@ -360,25 +344,25 @@ class InputBox:
                     else:
                         if keys[pygame.K_0]:
                             self.text += "0"
-                        elif keys[pygame.K_1]:
+                        if keys[pygame.K_1]:
                             self.text += "1"
-                        elif keys[pygame.K_2]:
+                        if keys[pygame.K_2]:
                             self.text += "2"
-                        elif keys[pygame.K_3]:
+                        if keys[pygame.K_3]:
                             self.text += "3"
-                        elif keys[pygame.K_4]:
+                        if keys[pygame.K_4]:
                             self.text += "4"
-                        elif keys[pygame.K_5]:
+                        if keys[pygame.K_5]:
                             self.text += "5"
-                        elif keys[pygame.K_6]:
+                        if keys[pygame.K_6]:
                             self.text += "6"
-                        elif keys[pygame.K_7]:
+                        if keys[pygame.K_7]:
                             self.text += "7"
-                        elif keys[pygame.K_8]:
+                        if keys[pygame.K_8]:
                             self.text += "8"
-                        elif keys[pygame.K_9]:
+                        if keys[pygame.K_9]:
                             self.text += "9"
-                        elif keys[pygame.K_PERIOD]:
+                        if keys[pygame.K_PERIOD]:
                             self.text += "."
             except ValueError:
                 self.key_pressed = False
@@ -487,13 +471,7 @@ class TicTac2:
                     self.add_column()
                     add_row_if_consecutively_extended()
 
-        for i in range(self.row_count):
-            for j in range(self.column_count):
-                self.pos = [screen_width / 2 - self.column_count * self.square_width / 2,
-                            screen_height / 2 - self.row_count * self.square_width / 2]
-                self.squares[i][j].state = self.square_values[i][j]
-                self.squares[i][j].pos = [self.pos[0] + j * self.square_width, self.pos[1] + i * self.square_width]
-                self.squares[i][j].width = self.square_width
+        self.normalise_squares()
 
         for i in range(self.row_count):
             for j in range(self.column_count - self.req_to_win + 1):
@@ -559,6 +537,15 @@ class TicTac2:
             self.square_width *= 0.9
 
         self.mouse_pressed = mouse_pressed
+
+    def normalise_squares(self):
+        for i in range(self.row_count):
+            for j in range(self.column_count):
+                self.pos = [screen_width / 2 - self.column_count * self.square_width / 2,
+                            screen_height / 2 - self.row_count * self.square_width / 2]
+                self.squares[i][j].state = self.square_values[i][j]
+                self.squares[i][j].pos = [self.pos[0] + j * self.square_width, self.pos[1] + i * self.square_width]
+                self.squares[i][j].width = self.square_width
 
     def check_if_won(self):
         for i in range(self.row_count):
@@ -703,7 +690,7 @@ class TicTac2:
             self.player = 1
 
 
-class TicTac2_server:
+class TicTac2_server(TicTac2):
     def __init__(self):
         self.mouse_pressed = True
         self.client_mouse_pressed = True
@@ -740,21 +727,6 @@ class TicTac2_server:
         thr = threading.Thread(target=self.sync_data)
         thr.start()
 
-    def draw(self):
-        for row in self.squares:
-            for square in row:
-                square.draw()
-        for i in range(1, self.column_count):
-            pygame.draw.line(screen, self.color,
-                             [int(self.pos[0] + self.square_width * i), int(self.pos[1])],
-                             [int(self.pos[0] + self.square_width * i), int(self.pos[1] + self.square_width * self.row_count)],
-                             int(self.square_width * 0.05))
-        for i in range(1, self.row_count):
-            pygame.draw.line(screen, self.color,
-                             [int(self.pos[0]), int(self.pos[1] + self.square_width * i)],
-                             [int(self.pos[0] + self.square_width * self.column_count), int(self.pos[1] + self.square_width * i)],
-                             int(self.square_width * 0.05))
-
     def update(self):
         mouse_pos = pygame.mouse.get_pos()
         mouse_pressed = pygame.mouse.get_pressed()[0]
@@ -780,76 +752,6 @@ class TicTac2_server:
         if self.won:
             self.client_mouse_pressed = True
 
-    def normalise_squares(self):
-        for i in range(self.row_count):
-            for j in range(self.column_count):
-                self.pos = [screen_width / 2 - self.column_count * self.square_width / 2,
-                            screen_height / 2 - self.row_count * self.square_width / 2]
-                self.squares[i][j].state = self.square_values[i][j]
-                self.squares[i][j].pos = [self.pos[0] + j * self.square_width, self.pos[1] + i * self.square_width]
-                self.squares[i][j].width = self.square_width
-
-    def check_if_won(self):
-        for i in range(self.row_count):
-            for j in range(self.column_count - self.req_to_win + 1):
-                value = self.square_values[i][j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[i][j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [j, i], [j + self.req_to_win - 1, i])
-
-        for i in range(self.column_count):
-            for j in range(self.row_count - self.req_to_win + 1):
-                value = self.square_values[j][i]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[j + k][i]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [i, j], [i, j + self.req_to_win - 1])
-
-        for i in range(self.row_count):
-            len_of_diagonal = min(self.row_count - i, self.column_count)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[i + j][j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[i + j + k][j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [j, i + j], [j + self.req_to_win - 1, i + j + self.req_to_win - 1])
-            len_of_diagonal = min(i + 1, self.column_count)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[i - j][j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[i - j - k][j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [j, i - j], [j + self.req_to_win - 1, i - j - self.req_to_win + 1])
-
-        for i in range(1, self.column_count):
-            len_of_diagonal = min(self.row_count, self.column_count - i)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[j][i + j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[j + k][i + j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [i + j, j], [i + j + self.req_to_win - 1, j + self.req_to_win - 1])
-            len_of_diagonal = min(self.row_count, self.column_count - i)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[self.row_count - j - 1][i + j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[self.row_count - j - 1 - k][i + j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [i + j, self.row_count - j - 1], [i + j + self.req_to_win - 1, self.row_count - j - 1 - self.req_to_win + 1])
-
     def clear(self):
         self.square_values = []
         self.squares = []
@@ -874,66 +776,6 @@ class TicTac2_server:
 
         # thread = threading.Thread(target=self.send_data)
         # thread.start()
-
-    def win(self, player, start_pos_of_line, end_pos_of_line):
-        global player1Score
-        global player2Score
-        if not self.won:
-            self.won = True
-            print(f"Player {player} Won!")
-            if player == 1:
-                player1Score += 1
-            elif player == 2:
-                player2Score += 1
-
-            if self.starting_player == 1:
-                self.starting_player = 2
-            elif self.starting_player == 2:
-                self.starting_player = 1
-            self.player = self.starting_player
-
-
-            invoke(self.clear, 1.6)
-        pygame.draw.line(screen, [55, 255, 55], [int(start_pos_of_line[0] * self.square_width + self.square_width / 2 + self.pos[0]), int(start_pos_of_line[1] * self.square_width + self.square_width / 2 + self.pos[1])], [int(end_pos_of_line[0] * self.square_width + self.square_width / 2 + self.pos[0]), int(end_pos_of_line[1] * self.square_width + self.square_width / 2 + self.pos[1])], int(self.square_width * 0.05))
-
-    def add_row(self, up=False):
-        self.row_count += 1
-        row = []
-        squares = []
-        if up:
-            for i in range(self.column_count):
-                row.append(0)
-                squares.append(
-                    Square([self.pos[0], self.pos[1] + i * self.square_width],
-                           width=self.square_width))
-            self.square_values.insert(0, row)
-            self.squares.insert(0, squares)
-        else:
-            for i in range(self.column_count):
-                row.append(0)
-                squares.append(Square([self.pos[0] + self.row_count * self.square_width, self.pos[1] + i * self.square_width],
-                                  width=self.square_width))
-            self.square_values.append(row)
-            self.squares.append(squares)
-
-    def add_column(self, left=False):
-        self.column_count += 1
-        if left:
-            for i in range(self.row_count):
-                self.square_values[i].insert(0, 0)
-                self.squares[i].insert(0, Square([self.pos[0] + self.row_count * i, self.pos[1] + i * self.square_width],
-                                              width=self.square_width))
-        else:
-            for i in range(self.row_count):
-                self.square_values[i].append(0)
-                self.squares[i].append(Square([self.pos[0] + self.row_count * i, self.pos[1] + i * self.square_width],
-                                  width=self.square_width))
-
-    def toggle_player(self):
-        if self.player == 1:
-            self.player = 2
-        elif self.player == 2:
-            self.player = 1
 
     def check_if_clicked(self, mouse_pressed, prev_mouse_pressed, mouse_pos):
         if mouse_pressed - prev_mouse_pressed == 1:
@@ -998,37 +840,27 @@ class TicTac2_server:
                     add_row_if_consecutively_extended()
             self.check_if_won()
             self.normalise_squares()
-            # thread = threading.Thread(target=self.send_data)
-            # thread.start()
-
-    def send_data(self):
-        data_file = open("server_data\\data_file.bin", "wb")
-        data = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
-        pickle.dump(data, data_file)
-        data_file.close()
-        send_file("server_data\\data_file.bin", client_ip, 5001)
-        print("sent")
-
-    def look_for_messages(self):
-        global running
-        global client_ip
-        global host
-        while running:
-            receive_file("server_data\\received.bin")
-            host = client_ip
-    
+ 
     def sync_data(self):
+        global client_ip
         while running:
-            self.received_data = self.conn.recv(2048)
-            print("received")
-            data = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
-            to_send = pickle.dumps(data)
-            self.conn.sendall(to_send)
-            print("sent")
-            time.sleep(0.1)
+            try:
+                self.received_data = self.conn.recv(2048)
+                # print("received")
+                data = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
+                to_send = pickle.dumps(data)
+                self.conn.sendall(to_send)
+                # print("sent")
+                time.sleep(0.1)
+            except:
+                print("Client disconnected")
+                client_ip = None
+                self.socket.close()
+                go_to_initial_menu()
+                break
 
 
-class TicTac2_client:
+class TicTac2_client(TicTac2):
     def __init__(self, address):
         self.address = address
         self.mouse_pressed = True
@@ -1069,21 +901,6 @@ class TicTac2_client:
         thr = threading.Thread(target=self.sync_data)
         thr.start()
         
-    def draw(self):
-        for row in self.squares:
-            for square in row:
-                square.draw()
-        for i in range(1, self.column_count):
-            pygame.draw.line(screen, self.color,
-                             [int(self.pos[0] + self.square_width * i), int(self.pos[1])],
-                             [int(self.pos[0] + self.square_width * i), int(self.pos[1] + self.square_width * self.row_count)],
-                             int(self.square_width * 0.05))
-        for i in range(1, self.row_count):
-            pygame.draw.line(screen, self.color,
-                             [int(self.pos[0]), int(self.pos[1] + self.square_width * i)],
-                             [int(self.pos[0] + self.square_width * self.column_count), int(self.pos[1] + self.square_width * i)],
-                             int(self.square_width * 0.05))
-
     def update(self):
         global player1Score
         global player2Score
@@ -1148,130 +965,26 @@ class TicTac2_client:
         self.mouse_pressed = True
         self.square_width = 60
         go_to_menu()
-
-        # data = [[0, 0], 0]
-        # thread = threading.Thread(target=self.send_data, args=(data,))
-        # thread.start()
-
-    def win(self, player, start_pos_of_line, end_pos_of_line):
-        global player1Score
-        global player2Score
-        if not self.won:
-            self.won = True
-            print(f"Player {player} Won!")
-            if player == 1:
-                player1Score += 1
-            elif player == 2:
-                player2Score += 1
-
-            if self.starting_player == 1:
-                self.starting_player = 2
-            elif self.starting_player == 2:
-                self.starting_player = 1
-            self.player = self.starting_player
-
-            invoke(self.clear, 1.6)
-        pygame.draw.line(screen, [55, 255, 55], [int(start_pos_of_line[0] * self.square_width + self.square_width / 2 + self.pos[0]), int(start_pos_of_line[1] * self.square_width + self.square_width / 2 + self.pos[1])], [int(end_pos_of_line[0] * self.square_width + self.square_width / 2 + self.pos[0]), int(end_pos_of_line[1] * self.square_width + self.square_width / 2 + self.pos[1])], int(self.square_width * 0.05))
-
-    def check_if_won(self):
-        for i in range(self.row_count):
-            for j in range(self.column_count - self.req_to_win + 1):
-                value = self.square_values[i][j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[i][j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [j, i], [j + self.req_to_win - 1, i])
-
-        for i in range(self.column_count):
-            for j in range(self.row_count - self.req_to_win + 1):
-                value = self.square_values[j][i]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[j + k][i]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [i, j], [i, j + self.req_to_win - 1])
-
-        for i in range(self.row_count):
-            len_of_diagonal = min(self.row_count - i, self.column_count)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[i + j][j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[i + j + k][j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [j, i + j], [j + self.req_to_win - 1, i + j + self.req_to_win - 1])
-            len_of_diagonal = min(i + 1, self.column_count)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[i - j][j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[i - j - k][j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [j, i - j], [j + self.req_to_win - 1, i - j - self.req_to_win + 1])
-
-        for i in range(1, self.column_count):
-            len_of_diagonal = min(self.row_count, self.column_count - i)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[j][i + j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[j + k][i + j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [i + j, j], [i + j + self.req_to_win - 1, j + self.req_to_win - 1])
-            len_of_diagonal = min(self.row_count, self.column_count - i)
-            for j in range(len_of_diagonal - self.req_to_win + 1):
-                value = self.square_values[self.row_count - j - 1][i + j]
-                for k in range(1, self.req_to_win):
-                    if value != self.square_values[self.row_count - j - 1 - k][i + j + k]:
-                        break
-                else:
-                    if value != 0:
-                        self.win(value, [i + j, self.row_count - j - 1], [i + j + self.req_to_win - 1, self.row_count - j - 1 - self.req_to_win + 1])
-
-    def send_data(self, data):
-        data_file = open("client_data\\data_file.bin", "wb")
-        pickle.dump(data, data_file)
-        data_file.close()
-        send_file("client_data\\data_file.bin", host, 5001)
-
-    def send_data_auto(self):
-        data_file = open("client_data\\data_file.bin", "wb")
-        data = [pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0]]
-        pickle.dump(data, data_file)
-        data_file.close()
-        send_file("client_data\\data_file.bin", host, 5001)
-
-    def look_for_messages(self):
-        global running
-        global client_ip
+   
+    def sync_data(self):
         global host
         while running:
-            receive_file("client_data\\received.bin")
-            print("receiver file")
-            host = client_ip
-    
-    def sync_data(self):
-        while running:
-            # data_file = open("client_data\\data_file.bin", "wb")
             data = None
             if len(self.to_send):
                 data = self.to_send.pop()
             else:
                 data = [[0, 0], 0]
             to_send_ = pickle.dumps(data)
-            # data_file.close()
-            # send_file("client_data\\data_file.bin", self.server_sock)
-            self.server_sock.sendall(to_send_)
-            print("sent")
-            # receive_file("client_data\\received.bin", self.server_sock)
-            self.received_data = self.server_sock.recv(2048)
-            print("rec")
+            try:
+                self.server_sock.sendall(to_send_)
+                # print("sent")
+                self.received_data = self.server_sock.recv(2048)
+            except:
+                host = None
+                go_to_initial_menu()
+                # print(game_state)
+                print("Host disconnected")
+                break
 
 
 class Menu:
@@ -1489,7 +1202,7 @@ class GameSelector:
                 go_to_menu()
                 pygame.display.update()
                 game = TicTac2_client(host)
-        elif screen_number == 4:
+        elif self.screen_number == 4:
             game = TicTac2()
             go_to_menu()
 

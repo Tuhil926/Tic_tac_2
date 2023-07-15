@@ -153,6 +153,9 @@ class Square:
 
     def draw(self):
         self.color = self.colors[self.state - 1]
+        mouse_pos = pygame.mouse.get_pos()
+        if mouse_pos[0] > self.pos[0] and mouse_pos[0] < self.pos[0] + self.width and mouse_pos[1] > self.pos[1] and mouse_pos[1] < self.pos[1] + self.width and self.state == 0:
+            pygame.draw.rect(screen, [30, 30, 30], [self.pos[0], self.pos[1], self.width, self.width])
         if self.state == 1:
             pygame.draw.circle(screen, self.color, [int(self.pos[0] + self.width / 2), int(self.pos[1] + self.width / 2)],
                                int(self.width * 0.8 / 2))
@@ -407,6 +410,9 @@ class TicTac2:
         self.starting_player = 1
 
     def draw(self):
+        for row in self.squares:
+            for square in row:
+                square.draw()
         for i in range(1, self.column_count):
             pygame.draw.line(screen, self.color,
                              [int(self.pos[0] + self.square_width * i), int(self.pos[1])],
@@ -417,9 +423,6 @@ class TicTac2:
                              [int(self.pos[0]), int(self.pos[1] + self.square_width * i)],
                              [int(self.pos[0] + self.square_width * self.column_count), int(self.pos[1] + self.square_width * i)],
                              int(self.square_width * 0.05))
-        for row in self.squares:
-            for square in row:
-                square.draw()
 
     def update(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -737,8 +740,10 @@ class TicTac2_server:
         thr = threading.Thread(target=self.sync_data)
         thr.start()
 
-
     def draw(self):
+        for row in self.squares:
+            for square in row:
+                square.draw()
         for i in range(1, self.column_count):
             pygame.draw.line(screen, self.color,
                              [int(self.pos[0] + self.square_width * i), int(self.pos[1])],
@@ -749,9 +754,6 @@ class TicTac2_server:
                              [int(self.pos[0]), int(self.pos[1] + self.square_width * i)],
                              [int(self.pos[0] + self.square_width * self.column_count), int(self.pos[1] + self.square_width * i)],
                              int(self.square_width * 0.05))
-        for row in self.squares:
-            for square in row:
-                square.draw()
 
     def update(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -1068,6 +1070,9 @@ class TicTac2_client:
         thr.start()
         
     def draw(self):
+        for row in self.squares:
+            for square in row:
+                square.draw()
         for i in range(1, self.column_count):
             pygame.draw.line(screen, self.color,
                              [int(self.pos[0] + self.square_width * i), int(self.pos[1])],
@@ -1078,9 +1083,6 @@ class TicTac2_client:
                              [int(self.pos[0]), int(self.pos[1] + self.square_width * i)],
                              [int(self.pos[0] + self.square_width * self.column_count), int(self.pos[1] + self.square_width * i)],
                              int(self.square_width * 0.05))
-        for row in self.squares:
-            for square in row:
-                square.draw()
 
     def update(self):
         global player1Score

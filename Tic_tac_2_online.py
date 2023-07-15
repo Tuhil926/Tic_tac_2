@@ -845,7 +845,7 @@ class TicTac2_server(TicTac2):
         global client_ip
         while running:
             try:
-                self.received_data = self.conn.recv(2048)
+                self.received_data = self.conn.recv(8096)
                 # print("received")
                 data = [self.squares, self.square_values, self.req_to_win, player1Score, player2Score, self.player]
                 to_send = pickle.dumps(data)
@@ -978,7 +978,7 @@ class TicTac2_client(TicTac2):
             try:
                 self.server_sock.sendall(to_send_)
                 # print("sent")
-                self.received_data = self.server_sock.recv(2048)
+                self.received_data = self.server_sock.recv(8096)
             except:
                 host = None
                 go_to_initial_menu()
